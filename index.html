@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Where is Armin? Live Location Tracker</title>
   
-  <!-- Explicitly pass Referrer header if deployed on a domain -->
   <meta name="referrer" content="strict-origin-when-cross-origin">
 
   <!-- Leaflet.js CSS -->
@@ -55,15 +54,6 @@
 
     .connected { background-color: #28a745; }
     .error { background-color: #dc3545; }
-
-    /* Custom Potato Marker CSS */
-    .potato-marker {
-      font-size: 36px;
-      line-height: 42px;
-      text-align: center;
-      filter: drop-shadow(0px 3px 5px rgba(0, 0, 0, 0.3));
-      user-select: none;
-    }
   </style>
 </head>
 <body>
@@ -85,7 +75,7 @@
     const CONFIG = {
       BIN_ID: '6a8a12a3f5f4af5e2936895d', 
       MASTER_KEY: '$2a$10$T37qiDxe.gLpewvCcUX4NOcVNv08inK6vFiwJF8rxSjX5V6Aa8aPC', 
-      POLL_INTERVAL_MS: 120000 // Updated to 2 mins to match iOS app interval
+      POLL_INTERVAL_MS: 120000 
     };
 
     let map;
@@ -93,20 +83,17 @@
     const statusTextEl = document.getElementById('status-text');
     const statusDotEl = document.getElementById('status-dot');
 
-    // Create Potato with Running Shoes Custom Icon
-    const potatoIcon = L.divIcon({
-      className: 'potato-marker',
-      html: '🥔👟',
-      iconSize: [42, 42],
-      iconAnchor: [21, 21],
-      popupAnchor: [0, -21]
+    // PNG Potato Icon
+    const potatoIcon = L.icon({
+      iconUrl: '/img/Potato.png', // Relative path to your downloaded PNG image
+      iconSize: [50, 50],   // Size of the icon on map
+      iconAnchor: [25, 50], // Point of the icon which corresponds to marker's location (bottom center)
+      popupAnchor: [0, -45] // Point from which the popup should open relative to the iconAnchor
     });
 
     function initMap() {
-      // Default view
       map = L.map('map').setView([0, 0], 2);
 
-      // CartoDB Voyager Tile Provider
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
         subdomains: 'abcd',
