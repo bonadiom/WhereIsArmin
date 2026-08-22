@@ -145,19 +145,25 @@
 
   const time = locationData.timestamp || new Date().toLocaleTimeString();
   
-  // Google Maps Directions URL using the coordinate destination
+  // Directions URLs
+  // Apple Maps link automatically opens Apple Maps on iOS/macOS, falls back to web/Google Maps elsewhere
+  const appleMapsUrl = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
-  // Popup content with styled Google Maps Directions button
   const popupContent = `
-    <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+    <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif; min-width: 170px;">
       <b style="font-size: 1.05rem;">Where is Armin?</b><br>
       <span style="font-size: 0.85rem; color: #555;">Updated: ${time}</span><br>
       <small style="color: #888;">Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</small>
-      <div style="margin-top: 10px;">
+      
+      <div style="margin-top: 10px; display: flex; gap: 6px; justify-content: center;">
+        <a href="${appleMapsUrl}" target="_blank" rel="noopener noreferrer" 
+           style="flex: 1; background-color: #000000; color: white; padding: 6px 8px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 0.75rem; text-align: center;">
+           🍎 Apple Maps
+        </a>
         <a href="${googleMapsUrl}" target="_blank" rel="noopener noreferrer" 
-           style="display: inline-block; background-color: #4285F4; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-weight: 600; font-size: 0.85rem;">
-           📍 Get Directions
+           style="flex: 1; background-color: #4285F4; color: white; padding: 6px 8px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 0.75rem; text-align: center;">
+           📍 Google Maps
         </a>
       </div>
     </div>
@@ -167,7 +173,6 @@
 
   updateStatus(`Connected. Updated: ${time}`, 'connected');
 }
-
     function updateStatus(text, type) {
       statusTextEl.textContent = text;
       statusDotEl.className = `status-dot ${type}`;
