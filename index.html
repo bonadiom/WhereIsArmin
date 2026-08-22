@@ -18,6 +18,7 @@
       height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     #map {
@@ -54,6 +55,78 @@
 
     .connected { background-color: #28a745; }
     .error { background-color: #dc3545; }
+
+    /* Bottom Sheet Styles */
+    .sheet-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .sheet-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bottom-sheet {
+      position: fixed;
+      bottom: -100%;
+      left: 0; width: 100%;
+      background: #ffffff;
+      border-radius: 16px 16px 0 0;
+      padding: 20px;
+      box-sizing: border-box;
+      z-index: 2001;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+      transition: bottom 0.3s cubic-bezier(0, 0, 0.2, 1);
+    }
+
+    .bottom-sheet.active {
+      bottom: 0;
+    }
+
+    .sheet-header {
+      font-weight: 600;
+      font-size: 1.1rem;
+      text-align: center;
+      margin-bottom: 16px;
+      color: #333;
+    }
+
+    .sheet-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .sheet-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: white;
+    }
+
+    .apple-btn { background-color: #000000; }
+    .google-btn { background-color: #4285F4; }
+
+    .cancel-btn {
+      background-color: #f1f3f4;
+      color: #333;
+      border: none;
+      width: 100%;
+      margin-top: 10px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -67,6 +140,21 @@
   </header>
 
   <div id="map"></div>
+
+  <!-- Slide-up Bottom Sheet -->
+  <div class="sheet-backdrop" id="sheetBackdrop" onclick="closeSheet()"></div>
+  <div class="bottom-sheet" id="bottomSheet">
+    <div class="sheet-header">Get Directions</div>
+    <div class="sheet-options">
+      <a href="#" id="appleLink" target="_blank" rel="noopener noreferrer" class="sheet-btn apple-btn" onclick="closeSheet()">
+        🍎 Apple Maps
+      </a>
+      <a href="#" id="googleLink" target="_blank" rel="noopener noreferrer" class="sheet-btn google-btn" onclick="closeSheet()">
+        📍 Google Maps
+      </a>
+      <button class="sheet-btn cancel-btn" onclick="closeSheet()">Cancel</button>
+    </div>
+  </div>
 
   <!-- Leaflet.js JavaScript -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -83,12 +171,11 @@
     const statusTextEl = document.getElementById('status-text');
     const statusDotEl = document.getElementById('status-dot');
 
-    // PNG Potato Icon
     const potatoIcon = L.icon({
-      iconUrl: './img/Potato.png', // Relative path to your downloaded PNG image
-      iconSize: [50, 50],   // Size of the icon on map
-      iconAnchor: [25, 50], // Point of the icon which corresponds to marker's location (bottom center)
-      popupAnchor: [0, -45] // Point from which the popup should open relative to the iconAnchor
+      iconUrl: 'img/potato.png',
+      iconSize: [50, 50],
+      iconAnchor: [25, 50],
+      popupAnchor: [0, -45]
     });
 
     function initMap() {
@@ -99,6 +186,19 @@
         subdomains: 'abcd',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       }).addTo(map);
+    }
+
+    function openDirectionsSheet(lat, lng) {
+      document.getElementById('appleLink').href = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+      document.getElementById('googleLink').href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+      
+      document.getElementById('sheetBackdrop').classList.add('active');
+      document.getElementById('bottomSheet').classList.add('active');
+    }
+
+    function closeSheet() {
+      document.getElementById('sheetBackdrop').classList.remove('active');
+      document.getElementById('bottomSheet').classList.remove('active');
     }
 
     async function fetchLocation() {
@@ -113,9 +213,7 @@
           }
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
         const data = await response.json();
         return data.record; 
@@ -127,52 +225,42 @@
       }
     }
 
-  function updateMap(locationData) {
-  if (!locationData || typeof locationData.lat !== 'number' || typeof locationData.lng !== 'number') {
-    updateStatus('Waiting for initial GPS location record...', 'error');
-    return;
-  }
+    function updateMap(locationData) {
+      if (!locationData || typeof locationData.lat !== 'number' || typeof locationData.lng !== 'number') {
+        updateStatus('Waiting for initial GPS location record...', 'error');
+        return;
+      }
 
-  const { lat, lng } = locationData;
-  const newLatLng = [lat, lng];
+      const { lat, lng } = locationData;
+      const newLatLng = [lat, lng];
 
-  if (!marker) {
-    marker = L.marker(newLatLng, { icon: potatoIcon }).addTo(map);
-    map.setView(newLatLng, 15); 
-  } else {
-    marker.setLatLng(newLatLng);
-  }
+      if (!marker) {
+        marker = L.marker(newLatLng, { icon: potatoIcon }).addTo(map);
+        map.setView(newLatLng, 15); 
+      } else {
+        marker.setLatLng(newLatLng);
+      }
 
-  const time = locationData.timestamp || new Date().toLocaleTimeString();
-  
-  // Directions URLs
-  // Apple Maps link automatically opens Apple Maps on iOS/macOS, falls back to web/Google Maps elsewhere
-  const appleMapsUrl = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+      const time = locationData.timestamp || new Date().toLocaleTimeString();
 
-  const popupContent = `
-    <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif; min-width: 170px;">
-      <b style="font-size: 1.05rem;">Where is Armin?</b><br>
-      <span style="font-size: 0.85rem; color: #555;">Updated: ${time}</span><br>
-      <small style="color: #888;">Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</small>
-      
-      <div style="margin-top: 10px; display: flex; gap: 6px; justify-content: center;">
-        <a href="${appleMapsUrl}" target="_blank" rel="noopener noreferrer" 
-           style="flex: 1; background-color: #000000; color: white; padding: 6px 8px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 0.75rem; text-align: center;">
-           🍎 Apple Maps
-        </a>
-        <a href="${googleMapsUrl}" target="_blank" rel="noopener noreferrer" 
-           style="flex: 1; background-color: #4285F4; color: white; padding: 6px 8px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 0.75rem; text-align: center;">
-           📍 Google Maps
-        </a>
-      </div>
-    </div>
-  `;
+      const popupContent = `
+        <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+          <b style="font-size: 1.05rem;">Where is Armin?</b><br>
+          <span style="font-size: 0.85rem; color: #555;">Updated: ${time}</span><br>
+          <small style="color: #888;">Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</small>
+          <div style="margin-top: 10px;">
+            <button onclick="openDirectionsSheet(${lat}, ${lng})" 
+                    style="background-color: #007aff; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+              🧭 Get Directions
+            </button>
+          </div>
+        </div>
+      `;
 
-  marker.bindPopup(popupContent).openPopup();
+      marker.bindPopup(popupContent).openPopup();
+      updateStatus(`Connected. Updated: ${time}`, 'connected');
+    }
 
-  updateStatus(`Connected. Updated: ${time}`, 'connected');
-}
     function updateStatus(text, type) {
       statusTextEl.textContent = text;
       statusDotEl.className = `status-dot ${type}`;
@@ -180,15 +268,11 @@
 
     async function trackLocation() {
       const location = await fetchLocation();
-      if (location) {
-        updateMap(location);
-      }
+      if (location) updateMap(location);
 
       setInterval(async () => {
         const updatedLocation = await fetchLocation();
-        if (updatedLocation) {
-          updateMap(updatedLocation);
-        }
+        if (updatedLocation) updateMap(updatedLocation);
       }, CONFIG.POLL_INTERVAL_MS);
     }
 
