@@ -189,12 +189,32 @@
     }
 
     function openDirectionsSheet(lat, lng) {
-      document.getElementById('appleLink').href = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
-      document.getElementById('googleLink').href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-      
-      document.getElementById('sheetBackdrop').classList.add('active');
-      document.getElementById('bottomSheet').classList.add('active');
-    }
+  // Deep link to force open the native Google Maps app directly
+  const googleAppUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
+  // Fallback web URL in case the app isn't installed
+  const googleWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+
+  // Set Apple Maps URL
+  document.getElementById('appleLink').href = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+  
+  // Set Google Maps click handler to attempt native app launch first
+  const googleBtn = document.getElementById('googleLink');
+  googleBtn.onclick = function(e) {
+    e.preventDefault();
+    closeSheet();
+    
+    // Try opening the native Google Maps app directly
+    window.location.href = googleAppUrl;
+
+    // Fallback to web interface after a short delay if app isn't installed
+    setTimeout(() => {
+      window.open(googleWebUrl, '_blank');
+    }, 500);
+  };
+
+  document.getElementById('sheetBackdrop').classList.add('active');
+  document.getElementById('bottomSheet').classList.add('active');
+}
 
     function closeSheet() {
       document.getElementById('sheetBackdrop').classList.remove('active');
