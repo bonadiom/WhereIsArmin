@@ -189,28 +189,30 @@
     }
 
     function openDirectionsSheet(lat, lng) {
-  // Deep link to force open the native Google Maps app directly
-  const googleAppUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
-  // Fallback web URL in case the app isn't installed
-  const googleWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-  // Set Apple Maps URL
-  document.getElementById('appleLink').href = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
-  
-  // Set Google Maps click handler to attempt native app launch first
+  // iOS Native App Deep Link vs Android/Web Universal Link
+  const googleMapsUrl = isIOS 
+    ? `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`
+    : `intent://maps.google.com/maps?daddr=${lat},${lng}#Intent;scheme=https;package=com.google.android.apps.maps;end;`;
+
+  // Apple Maps URL (Native on iOS/macOS)
+  const appleMapsUrl = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+
+  // Assign links directly to the anchors
   const googleBtn = document.getElementById('googleLink');
-  googleBtn.onclick = function(e) {
-    e.preventDefault();
-    closeSheet();
-    
-    // Try opening the native Google Maps app directly
-    window.location.href = googleAppUrl;
+  const appleBtn = document.getElementById('appleLink');
 
-    // Fallback to web interface after a short delay if app isn't installed
-    setTimeout(() => {
-      window.open(googleWebUrl, '_blank');
-    }, 500);
-  };
+  googleBtn.href = googleMapsUrl;
+  appleBtn.href = appleMapsUrl;
+
+  // Remove custom JS handlers so the browser natively processes the deep link
+  googleBtn.onclick = function() { closeSheet(); };
+  appleBtn.onclick = function() { closeSheet(); };
+
+  document.getElementById('sheetBackdrop').classList.add('active');
+  document.getElementById('bottomSheet').classList.add('active');
+}
 
   document.getElementById('sheetBackdrop').classList.add('active');
   document.getElementById('bottomSheet').classList.add('active');
