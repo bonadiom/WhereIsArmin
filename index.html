@@ -171,6 +171,9 @@
 
     let map;
     let marker;
+    let lastCoords = null;
+    const breadcrumbMarkers = [];
+
     const statusTextEl = document.getElementById('status-text');
     const statusDotEl = document.getElementById('status-dot');
 
@@ -179,6 +182,13 @@
       iconSize: [50, 50],
       iconAnchor: [25, 50],
       popupAnchor: [0, -45]
+    });
+
+    const breadcrumbIcon = L.icon({
+      iconUrl: 'img/Potato.png',
+      iconSize: [24, 24],
+      iconAnchor: [12, 24],
+      popupAnchor: [0, -20]
     });
 
     function initMap() {
@@ -203,7 +213,6 @@
         e.preventDefault();
         closeSheet();
         
-        // Attempt native scheme on mobile, fallback to web URL
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         if (isMobile) {
           window.location.href = googleAppUrl;
@@ -250,6 +259,28 @@
 
       const { lat, lng } = locationData;
       const newLatLng = [lat, lng];
+      const time = locationData.timestamp || new Date().toLocaleTimeString();
+
+      // Drop a breadcrumb if coordinates have shifted from the last record
+      if (lastCoords && (lastCoords.lat !== lat || lastCoords.lng !== lng)) {
+        const oldPoint = [lastCoords.lat, lastCoords.lng];
+        
+        const breadcrumb = L.marker(oldPoint, { 
+          icon: breadcrumbIcon,
+          opacity: 0.75 
+        }).addTo(map);
+
+        breadcrumb.bindPopup(`
+          <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.85rem;">
+            <b>Past Location</b><br>
+            <span style="color: #666;">Recorded: ${lastCoords.time}</span>
+          </div>
+        `);
+
+        breadcrumbMarkers.push(breadcrumb);
+      }
+
+      lastCoords = { lat, lng, time };
 
       if (!marker) {
         marker = L.marker(newLatLng, { icon: potatoIcon }).addTo(map);
@@ -257,8 +288,6 @@
       } else {
         marker.setLatLng(newLatLng);
       }
-
-      const time = locationData.timestamp || new Date().toLocaleTimeString();
 
       const popupContent = `
         <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
