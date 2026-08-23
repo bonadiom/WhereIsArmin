@@ -231,24 +231,36 @@
       document.getElementById('bottomSheet').classList.remove('active');
     }
 
-    async function fetchLocation() {
-      const url = `https://api.jsonbin.io/v3/b/${CONFIG.BIN_ID}/latest`;
-      try {
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'X-Master-Key': CONFIG.MASTER_KEY,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
-        return data.record;
-      } catch (error) {
-        console.error('Error fetching location:', error);
-        updateStatus('Error connecting to JSONBin', 'error');
-        return null;
+    let pollingIntervalId = null;
+
+    async function trackLocation() {
+    const location = await fetchLocation();
+  
+    if (location) {
+      updateMap(location);
+  
+        // Stop polling immediately if polling flag is "N" or false
+    if (location.polling === 'N' || location.polling === false) {
+          updateStatus('Connected (Polling Paused)', 'connected');
+          return; 
+        }
       }
+    
+      // Otherwise, set up recurring polling
+      pollingIntervalId = setInterval(async () => {
+        const updatedLocation = await fetchLocation();
+        
+        if (updatedLocation) {
+          updateMap(updatedLocation);
+    
+          // Stop recurring interval if subsequent update disables polling
+          if (updatedLocation.polling === 'N' || updatedLocation.polling === false) {
+            clearInterval(pollingIntervalId);
+            pollingIntervalId = null;
+            updateStatus('Connected (Polling Paused)', 'connected');
+          }
+        }
+      }, CONFIG.POLL_INTERVAL_MS);
     }
 
     function updateMap(locationData) {
