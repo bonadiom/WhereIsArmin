@@ -4,9 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Where is Armin? Live Location Tracker</title>
-  <link rel="icon" type="image/png" href="img/Potato.png">
   
   <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="img/Potato.png">
 
   <!-- Leaflet.js CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -115,6 +117,7 @@
       font-weight: 600;
       font-size: 0.95rem;
       color: white;
+      cursor: pointer;
     }
 
     .apple-btn { background-color: #000000; }
@@ -126,7 +129,6 @@
       border: none;
       width: 100%;
       margin-top: 10px;
-      cursor: pointer;
     }
   </style>
 </head>
@@ -136,7 +138,7 @@
     <h1>Where is Armin? Live Tracking</h1>
     <div id="status">
       <span class="status-dot" id="status-dot"></span>
-      <span id="status-text">Connecting to JSONBin...</span>
+      <span id="status-text">Connecting...</span>
     </div>
   </header>
 
@@ -150,7 +152,7 @@
       <a href="#" id="appleLink" target="_blank" rel="noopener noreferrer" class="sheet-btn apple-btn" onclick="closeSheet()">
         🍎 Apple Maps
       </a>
-      <a href="#" id="googleLink" target="_blank" rel="noopener noreferrer" class="sheet-btn google-btn" onclick="closeSheet()">
+      <a href="#" id="googleLink" class="sheet-btn google-btn">
         📍 Google Maps
       </a>
       <button class="sheet-btn cancel-btn" onclick="closeSheet()">Cancel</button>
@@ -173,7 +175,7 @@
     const statusDotEl = document.getElementById('status-dot');
 
     const potatoIcon = L.icon({
-      iconUrl: 'img/potato.png',
+      iconUrl: 'img/Potato.png',
       iconSize: [50, 50],
       iconAnchor: [25, 50],
       popupAnchor: [0, -45]
@@ -185,39 +187,35 @@
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
         subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
     }
 
     function openDirectionsSheet(lat, lng) {
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const appleUrl = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+      const googleWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+      const googleAppUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
 
-  // iOS Native App Deep Link vs Android/Web Universal Link
-  const googleMapsUrl = isIOS 
-    ? `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`
-    : `intent://maps.google.com/maps?daddr=${lat},${lng}#Intent;scheme=https;package=com.google.android.apps.maps;end;`;
+      document.getElementById('appleLink').href = appleUrl;
 
-  // Apple Maps URL (Native on iOS/macOS)
-  const appleMapsUrl = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+      const googleBtn = document.getElementById('googleLink');
+      googleBtn.onclick = function(e) {
+        e.preventDefault();
+        closeSheet();
+        
+        // Attempt native scheme on mobile, fallback to web URL
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+          window.location.href = googleAppUrl;
+          setTimeout(() => { window.location.href = googleWebUrl; }, 1000);
+        } else {
+          window.open(googleWebUrl, '_blank');
+        }
+      };
 
-  // Assign links directly to the anchors
-  const googleBtn = document.getElementById('googleLink');
-  const appleBtn = document.getElementById('appleLink');
-
-  googleBtn.href = googleMapsUrl;
-  appleBtn.href = appleMapsUrl;
-
-  // Remove custom JS handlers so the browser natively processes the deep link
-  googleBtn.onclick = function() { closeSheet(); };
-  appleBtn.onclick = function() { closeSheet(); };
-
-  document.getElementById('sheetBackdrop').classList.add('active');
-  document.getElementById('bottomSheet').classList.add('active');
-}
-
-  document.getElementById('sheetBackdrop').classList.add('active');
-  document.getElementById('bottomSheet').classList.add('active');
-}
+      document.getElementById('sheetBackdrop').classList.add('active');
+      document.getElementById('bottomSheet').classList.add('active');
+    }
 
     function closeSheet() {
       document.getElementById('sheetBackdrop').classList.remove('active');
@@ -226,7 +224,6 @@
 
     async function fetchLocation() {
       const url = `https://api.jsonbin.io/v3/b/${CONFIG.BIN_ID}/latest`;
-      
       try {
         const response = await fetch(url, {
           method: 'GET',
@@ -235,12 +232,9 @@
             'Content-Type': 'application/json'
           }
         });
-
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
         const data = await response.json();
-        return data.record; 
-
+        return data.record;
       } catch (error) {
         console.error('Error fetching location:', error);
         updateStatus('Error connecting to JSONBin', 'error');
@@ -250,7 +244,7 @@
 
     function updateMap(locationData) {
       if (!locationData || typeof locationData.lat !== 'number' || typeof locationData.lng !== 'number') {
-        updateStatus('Waiting for initial GPS location record...', 'error');
+        updateStatus('Waiting for location data...', 'error');
         return;
       }
 
@@ -259,7 +253,7 @@
 
       if (!marker) {
         marker = L.marker(newLatLng, { icon: potatoIcon }).addTo(map);
-        map.setView(newLatLng, 15); 
+        map.setView(newLatLng, 15);
       } else {
         marker.setLatLng(newLatLng);
       }
