@@ -80,22 +80,110 @@
             background-color: #ff3b30;
         }
 
-        /* Marker Popup Styling */
+        /* Marker Popup Button */
         .directions-btn {
             display: inline-block;
             margin-top: 8px;
-            padding: 6px 12px;
-            background-color: #34c759;
+            padding: 6px 14px;
+            background-color: #007aff;
             color: white !important;
-            text-decoration: none;
+            border: none;
             border-radius: 12px;
             font-size: 12px;
             font-weight: 600;
-            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
         }
 
         .directions-btn:hover {
-            background-color: #28a745;
+            background-color: #0056b3;
+        }
+
+        /* Slide-Up Panel Overlay */
+        .action-sheet-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .action-sheet-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .action-sheet {
+            width: 100%;
+            max-width: 420px;
+            background: #f2f2f7;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            padding: 16px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .action-sheet-overlay.active .action-sheet {
+            transform: translateY(0);
+        }
+
+        .action-sheet-header {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #8e8e93;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .action-sheet-group {
+            background: #ffffff;
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .action-sheet-btn {
+            width: 100%;
+            padding: 14px;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #e5e5ea;
+            font-size: 16px;
+            font-weight: 600;
+            color: #007aff;
+            cursor: pointer;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .action-sheet-btn:last-child {
+            border-bottom: none;
+        }
+
+        .action-sheet-btn:active {
+            background-color: #e5e5ea;
+        }
+
+        .action-sheet-cancel {
+            background: #ffffff;
+            border-radius: 14px;
+            font-weight: 700;
+            color: #ff3b30;
         }
     </style>
 </head>
@@ -112,6 +200,18 @@
 
     <div id="map"></div>
 
+    <!-- Slide-Up Action Sheet Panel -->
+    <div id="actionSheetOverlay" class="action-sheet-overlay" onclick="closeActionSheet(event)">
+        <div class="action-sheet">
+            <div class="action-sheet-header">Get Directions</div>
+            <div class="action-sheet-group">
+                <button class="action-sheet-btn" onclick="openMapApp('google')">🗺️ Open Google Maps</button>
+                <button class="action-sheet-btn" onclick="openMapApp('apple')">🍎 Open Apple Maps</button>
+            </div>
+            <button class="action-sheet-btn action-sheet-cancel" onclick="closeActionSheet()">Cancel</button>
+        </div>
+    </div>
+
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -123,6 +223,7 @@
 
         let map, marker, pathLine;
         let pollTimer = null;
+        let targetCoords = { lat: 0, lng: 0 };
 
         // Custom Potato Marker
         const potatoIcon = L.icon({
@@ -136,7 +237,6 @@
         function initMap() {
             map = L.map('map').setView([0, 0], 2);
 
-            // Fixed Carto Base Layer using key parameter
             L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`, {
                 attribution: '&copy; OpenStreetMap &copy; CARTO',
                 maxZoom: 19
@@ -148,14 +248,29 @@
             pollTimer = setInterval(fetchLocationData, POLL_INTERVAL);
         }
 
-        // Generate Directions URL based on Device Platform
-        function getDirectionsUrl(lat, lng) {
-            const isAppleDevice = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent);
-            if (isAppleDevice) {
-                return `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
-            } else {
-                return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+        // Action Sheet Controls
+        function showActionSheet() {
+            document.getElementById('actionSheetOverlay').classList.add('active');
+        }
+
+        function closeActionSheet(event) {
+            if (!event || event.target.id === 'actionSheetOverlay' || event.target.classList.contains('action-sheet-cancel')) {
+                document.getElementById('actionSheetOverlay').classList.remove('active');
             }
+        }
+
+        function openMapApp(provider) {
+            const { lat, lng } = targetCoords;
+            let url = '';
+
+            if (provider === 'google') {
+                url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+            } else if (provider === 'apple') {
+                url = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+            }
+
+            if (url) window.open(url, '_blank');
+            closeActionSheet();
         }
 
         // Fetch Data from JSONBin
@@ -174,7 +289,6 @@
                 if (data && data.record) {
                     const record = data.record;
 
-                    // Stop polling if server signals polling is disabled
                     if (record.isPolling === false || record.polling === false) {
                         if (pollTimer) {
                             clearInterval(pollTimer);
@@ -198,14 +312,14 @@
 
         // Render Location Marker and Breadcrumb Line
         function renderTrackingData(record) {
+            targetCoords = { lat: record.lat, lng: record.lng };
             const currentLatLng = [record.lat, record.lng];
-            const directionsUrl = getDirectionsUrl(record.lat, record.lng);
 
             const popupContent = `
                 <div style="text-align: center;">
                     <b>Armin</b><br>
                     <span style="font-size: 11px; color: #666;">Updated: ${record.timestamp || 'Just now'}</span><br>
-                    <a href="${directionsUrl}" target="_blank" class="directions-btn">🚗 Get Directions</a>
+                    <button class="directions-btn" onclick="showActionSheet()">🚗 Get Directions</button>
                 </div>
             `;
 
