@@ -1,353 +1,253 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Where is Armin? Live Location Tracker</title>
-  
-  <meta name="referrer" content="strict-origin-when-cross-origin">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="img/Potato.png">
-
-  <!-- Leaflet.js CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    #map {
-      flex: 1;
-      width: 100%;
-    }
-
-    header {
-      background-color: #ffffff;
-      padding: 10px 20px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      z-index: 1000;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    h1 { margin: 0; font-size: 1.2rem; color: #333; }
-
-    #status {
-      font-size: 0.9rem;
-      color: #666;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .status-dot {
-      height: 10px; width: 10px;
-      border-radius: 50%;
-      background-color: #ccc;
-      display: inline-block;
-    }
-
-    .connected { background-color: #28a745; }
-    .error { background-color: #dc3545; }
-
-    /* Bottom Sheet Styles */
-    .sheet-backdrop {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.4);
-      z-index: 2000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-
-    .sheet-backdrop.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .bottom-sheet {
-      position: fixed;
-      bottom: -100%;
-      left: 0; width: 100%;
-      background: #ffffff;
-      border-radius: 16px 16px 0 0;
-      padding: 20px;
-      box-sizing: border-box;
-      z-index: 2001;
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-      transition: bottom 0.3s cubic-bezier(0, 0, 0.2, 1);
-    }
-
-    .bottom-sheet.active {
-      bottom: 0;
-    }
-
-    .sheet-header {
-      font-weight: 600;
-      font-size: 1.1rem;
-      text-align: center;
-      margin-bottom: 16px;
-      color: #333;
-    }
-
-    .sheet-options {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .sheet-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px;
-      border-radius: 10px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.95rem;
-      color: white;
-      cursor: pointer;
-    }
-
-    .apple-btn { background-color: #000000; }
-    .google-btn { background-color: #4285F4; }
-
-    .cancel-btn {
-      background-color: #f1f3f4;
-      color: #333;
-      border: none;
-      width: 100%;
-      margin-top: 10px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Where is Armin?</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            height: 100%;
+            width: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            background-color: #f5f5f7;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+        .status-card {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 10px 18px;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #1d1d1f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+            max-width: 90%;
+            text-align: center;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #8e8e93;
+            display: inline-block;
+        }
+        .status-dot.connected { background-color: #34c759; }
+        .status-dot.error { background-color: #ff3b30; }
+        
+        .potato-icon {
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border: 2px solid #ffffff;
+            transition: transform 0.2s ease;
+        }
+    </style>
 </head>
 <body>
 
-  <header>
-    <h1>Where is Armin? Live Tracking</h1>
-    <div id="status">
-      <span class="status-dot" id="status-dot"></span>
-      <span id="status-text">Connecting...</span>
+    <div class="status-card">
+        <span id="status-dot" class="status-dot"></span>
+        <span id="status-text">Connecting to tracker...</span>
     </div>
-  </header>
 
-  <div id="map"></div>
+    <div id="map"></div>
 
-  <!-- Slide-up Bottom Sheet -->
-  <div class="sheet-backdrop" id="sheetBackdrop" onclick="closeSheet()"></div>
-  <div class="bottom-sheet" id="bottomSheet">
-    <div class="sheet-header">Get Directions</div>
-    <div class="sheet-options">
-      <a href="#" id="appleLink" target="_blank" rel="noopener noreferrer" class="sheet-btn apple-btn" onclick="closeSheet()">
-        🍎 Apple Maps
-      </a>
-      <a href="#" id="googleLink" class="sheet-btn google-btn">
-        📍 Google Maps
-      </a>
-      <button class="sheet-btn cancel-btn" onclick="closeSheet()">Cancel</button>
-    </div>
-  </div>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Leaflet.js JavaScript -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        const BIN_ID = '6a8a12a3f5f4af5e2936895d';
+        const MASTER_KEY = '$2a$10$T37qiDxe.gLpewvCcUX4NOcVNv08inK6vFiwJF8rxSjX5V6Aa8aPC';
+        const POLL_INTERVAL = 30000; // Poll JSONBin every 30 seconds
 
-  <script>
-    const CONFIG = {
-      BIN_ID: '6a8a12a3f5f4af5e2936895d', 
-      MASTER_KEY: '$2a$10$T37qiDxe.gLpewvCcUX4NOcVNv08inK6vFiwJF8rxSjX5V6Aa8aPC', 
-      POLL_INTERVAL_MS: 120000 
-    };
+        let map;
+        let mainMarker;
+        let polylineLayer = null;
+        const breadcrumbGroup = L.layerGroup();
 
-    let map;
-    let marker;
-    let lastCoords = null;
-    let pollingIntervalId = null;
-    const breadcrumbMarkers = [];
-
-    const statusTextEl = document.getElementById('status-text');
-    const statusDotEl = document.getElementById('status-dot');
-
-    const potatoIcon = L.icon({
-      iconUrl: 'img/Potato.png',
-      iconSize: [50, 50],
-      iconAnchor: [25, 50],
-      popupAnchor: [0, -45]
-    });
-
-    const breadcrumbIcon = L.icon({
-      iconUrl: 'img/Potato.png',
-      iconSize: [24, 24],
-      iconAnchor: [12, 24],
-      popupAnchor: [0, -20]
-    });
-
-    function initMap() {
-      map = L.map('map').setView([0, 0], 2);
-
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_3hv2_1_ded0cfddf9aef0a5008bf567', {
-        maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-      }).addTo(map);
-    }
-
-    function openDirectionsSheet(lat, lng) {
-      const appleUrl = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
-      const googleWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-      const googleAppUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
-
-      document.getElementById('appleLink').href = appleUrl;
-
-      const googleBtn = document.getElementById('googleLink');
-      googleBtn.onclick = function(e) {
-        e.preventDefault();
-        closeSheet();
-        
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-          window.location.href = googleAppUrl;
-          setTimeout(() => { window.location.href = googleWebUrl; }, 1000);
-        } else {
-          window.open(googleWebUrl, '_blank');
-        }
-      };
-
-      document.getElementById('sheetBackdrop').classList.add('active');
-      document.getElementById('bottomSheet').classList.add('active');
-    }
-
-    function closeSheet() {
-      document.getElementById('sheetBackdrop').classList.remove('active');
-      document.getElementById('bottomSheet').classList.remove('active');
-    }
-
-    function updateStatus(text, type) {
-      statusTextEl.textContent = text;
-      statusDotEl.className = `status-dot ${type}`;
-    }
-
-    async function fetchLocation() {
-      const url = `https://api.jsonbin.io/v3/b/${CONFIG.BIN_ID}/latest`;
-      
-      try {
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'X-Master-Key': CONFIG.MASTER_KEY,
-            'Content-Type': 'application/json'
-          }
+        // Custom icon for current position
+        const potatoIcon = L.icon({
+            iconUrl: 'potato.png',
+            iconSize: [46, 46],
+            iconAnchor: [23, 23],
+            popupAnchor: [0, -23],
+            className: 'potato-icon'
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false
+            }).setView([0, 0], 2);
+
+            // Add Zoom control in bottom right
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // High contrast Voyager tile layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_3hv2_1_ded0cfddf9aef0a5008bf567', {
+                maxZoom: 19,
+                subdomains: 'abcd',
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            }).addTo(map);
+
+            breadcrumbGroup.addTo(map);
         }
 
-        const data = await response.json();
-        return data.record;
-      } catch (error) {
-        console.error('Failed to fetch location:', error);
-        updateStatus(`Fetch Error: ${error.message}`, 'error');
-        return null;
-      }
-    }
-
-    function updateMap(locationData) {
-      if (!locationData || typeof locationData.lat !== 'number' || typeof locationData.lng !== 'number') {
-        updateStatus('Waiting for location data...', 'error');
-        return;
-      }
-
-      const { lat, lng } = locationData;
-      const newLatLng = [lat, lng];
-      const time = locationData.timestamp || new Date().toLocaleTimeString();
-
-      if (lastCoords && (lastCoords.lat !== lat || lastCoords.lng !== lng)) {
-        const oldPoint = [lastCoords.lat, lastCoords.lng];
-        
-        const breadcrumb = L.marker(oldPoint, { 
-          icon: breadcrumbIcon,
-          opacity: 0.75 
-        }).addTo(map);
-
-        breadcrumb.bindPopup(`
-          <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.85rem;">
-            <b>Past Location</b><br>
-            <span style="color: #666;">Recorded: ${lastCoords.time}</span>
-          </div>
-        `);
-
-        breadcrumbMarkers.push(breadcrumb);
-      }
-
-      lastCoords = { lat, lng, time };
-
-      if (!marker) {
-        marker = L.marker(newLatLng, { icon: potatoIcon }).addTo(map);
-        map.setView(newLatLng, 15);
-      } else {
-        marker.setLatLng(newLatLng);
-      }
-
-      const popupContent = `
-        <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-          <b style="font-size: 1.05rem;">Where is Armin?</b><br>
-          <span style="font-size: 0.85rem; color: #555;">Updated: ${time}</span><br>
-          <small style="color: #888;">Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</small>
-          <div style="margin-top: 10px;">
-            <button onclick="openDirectionsSheet(${lat}, ${lng})" 
-                    style="background-color: #007aff; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
-              🧭 Get Directions
-            </button>
-          </div>
-        </div>
-      `;
-
-      marker.bindPopup(popupContent).openPopup();
-      updateStatus(`Connected. Updated: ${time}`, 'connected');
-    }
-
-    async function trackLocation() {
-      const location = await fetchLocation();
-    
-      if (location) {
-        updateMap(location);
-    
-        if (location.polling === 'N' || location.polling === false) {
-          updateStatus('Connected (Polling Paused)', 'connected');
-          return; 
+        function updateStatus(text, type) {
+            const statusText = document.getElementById('status-text');
+            const statusDot = document.getElementById('status-dot');
+            statusText.textContent = text;
+            statusDot.className = 'status-dot ' + (type || '');
         }
-      }
-      
-      pollingIntervalId = setInterval(async () => {
-        const updatedLocation = await fetchLocation();
-        
-        if (updatedLocation) {
-          updateMap(updatedLocation);
-    
-          if (updatedLocation.polling === 'N' || updatedLocation.polling === false) {
-            clearInterval(pollingIntervalId);
-            pollingIntervalId = null;
-            updateStatus('Connected (Polling Paused)', 'connected');
-          }
-        }
-      }, CONFIG.POLL_INTERVAL_MS);
-    }
 
-    window.onload = () => {
-      initMap();
-      trackLocation();
-    };
-  </script>
+        function openDirectionsSheet(lat, lng) {
+            const isAppleDevice = /Mac|iPhone|iPod|iPad/i.test(navigator.userAgent);
+            const url = isAppleDevice 
+                ? `http://maps.apple.com/?daddr=${lat},${lng}`
+                : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+            window.open(url, '_blank');
+        }
+
+        async function fetchLocationData() {
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': MASTER_KEY
+                    }
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const data = await response.json();
+                if (data && data.record) {
+                    renderTrackingData(data.record);
+                } else {
+                    updateStatus('Invalid data format received', 'error');
+                }
+            } catch (err) {
+                console.error('Fetch error:', err);
+                updateStatus('Connection error', 'error');
+            }
+        }
+
+        function renderTrackingData(record) {
+            const { lat, lng, timestamp, history } = record;
+
+            if (typeof lat !== 'number' || typeof lng !== 'number') {
+                updateStatus('Waiting for valid GPS signal...', 'error');
+                return;
+            }
+
+            const currentLatLng = [lat, lng];
+
+            // 1. Process Breadcrumb History Array
+            const pathCoordinates = [];
+            breadcrumbGroup.clearLayers();
+
+            if (Array.isArray(history) && history.length > 0) {
+                history.forEach((point) => {
+                    if (typeof point.lat === 'number' && typeof point.lng === 'number') {
+                        const pt = [point.lat, point.lng];
+                        pathCoordinates.push(pt);
+
+                        // Render individual way-point dots for history
+                        const dotMarker = L.circleMarker(pt, {
+                            radius: 5,
+                            fillColor: '#007aff',
+                            color: '#ffffff',
+                            weight: 1.5,
+                            opacity: 0.9,
+                            fillOpacity: 0.85
+                        });
+
+                        dotMarker.bindPopup(`
+                            <div style="text-align: center; font-size: 0.8rem;">
+                                <b>Way-point</b><br>
+                                <span style="color: #666;">${point.timestamp || 'Past fix'}</span>
+                            </div>
+                        `);
+
+                        breadcrumbGroup.addLayer(dotMarker);
+                    }
+                });
+            }
+
+            // Ensure current live coordinate is at the end of the path array
+            if (pathCoordinates.length === 0 || 
+               (pathCoordinates[pathCoordinates.length - 1][0] !== lat || pathCoordinates[pathCoordinates.length - 1][1] !== lng)) {
+                pathCoordinates.push(currentLatLng);
+            }
+
+            // 2. Draw or Update Polyline Trail
+            if (pathCoordinates.length > 1) {
+                if (!polylineLayer) {
+                    polylineLayer = L.polyline(pathCoordinates, {
+                        color: '#007aff',
+                        weight: 4,
+                        opacity: 0.65,
+                        dashArray: '6, 8',
+                        lineJoin: 'round'
+                    }).addTo(map);
+                } else {
+                    polylineLayer.setLatLngs(pathCoordinates);
+                }
+            }
+
+            // 3. Render or Move Main Live Marker
+            if (!mainMarker) {
+                mainMarker = L.marker(currentLatLng, { icon: potatoIcon }).addTo(map);
+                map.setView(currentLatLng, 15);
+            } else {
+                mainMarker.setLatLng(currentLatLng);
+            }
+
+            const popupContent = `
+                <div style="text-align: center;">
+                    <b style="font-size: 1.05rem;">Where is Armin?</b><br>
+                    <span style="font-size: 0.85rem; color: #555;">Updated: ${timestamp || 'Just now'}</span><br>
+                    <small style="color: #888;">Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</small>
+                    <div style="margin-top: 10px;">
+                        <button onclick="openDirectionsSheet(${lat}, ${lng})" 
+                                style="background-color: #007aff; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                            🧭 Get Directions
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            mainMarker.bindPopup(popupContent);
+            updateStatus(`Connected. Updated: ${timestamp || 'Live'}`, 'connected');
+        }
+
+        // Initialize application
+        window.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            fetchLocationData();
+            setInterval(fetchLocationData, POLL_INTERVAL);
+        });
+    </script>
 </body>
 </html>
