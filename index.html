@@ -72,7 +72,7 @@
             box-shadow: 0 0 8px #34c759;
         }
 
-        .status-indicator.paused {
+        .status-indicator.disabled {
             background-color: #ff9500;
         }
 
@@ -80,39 +80,22 @@
             background-color: #ff3b30;
         }
 
-        /* Controls */
-        .map-select {
-            padding: 4px 8px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            font-size: 13px;
-            background: white;
-            cursor: pointer;
-            outline: none;
-        }
-
-        .btn-toggle {
-            background-color: #007aff;
-            color: #ffffff;
-            border: none;
-            padding: 6px 14px;
-            border-radius: 16px;
+        /* Marker Popup Styling */
+        .directions-btn {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 6px 12px;
+            background-color: #34c759;
+            color: white !important;
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 12px;
             font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            transition: background-color 0.2s ease, transform 0.1s ease;
+            text-align: center;
         }
 
-        .btn-toggle:hover {
-            background-color: #0056b3;
-        }
-
-        .btn-toggle:active {
-            transform: scale(0.96);
-        }
-
-        .btn-toggle.off {
-            background-color: #8e8e93;
+        .directions-btn:hover {
+            background-color: #28a745;
         }
     </style>
 </head>
@@ -125,15 +108,6 @@
             <span id="statusIndicator" class="status-indicator"></span>
             <span id="statusText">Connecting...</span>
         </div>
-
-        <!-- Map Layer Selector -->
-        <select id="mapStyleSelect" class="map-select" onchange="switchMapLayer(this.value)">
-            <option value="carto">Default Vector</option>
-            <option value="google">Google Maps (Roadmap)</option>
-            <option value="satellite">Google Satellite</option>
-        </select>
-
-        <button id="togglePollingBtn" class="btn-toggle" onclick="togglePolling()">Pause</button>
     </div>
 
     <div id="map"></div>
@@ -144,12 +118,11 @@
     <script>
         const BIN_ID = '6a8a12a3f5f4af5e2936895d';
         const MASTER_KEY = '$2a$10$GXxVX6GLqhKDpXueW6PhqeL6Vfz9YTosERgsmxkPeplmCvzMIkPCi';
+        const CARTO_KEY = 'cb1_3hv2_1_ded0cfddf9aef0a5008bf567';
         const POLL_INTERVAL = 15000;
 
         let map, marker, pathLine;
-        let currentTileLayer;
         let pollTimer = null;
-        let isPollingActive = true;
 
         // Custom Potato Marker
         const potatoIcon = L.icon({
@@ -159,43 +132,29 @@
             popupAnchor: [0, -21]
         });
 
-        // Tile Layer Definitions
-        const tileLayers = {
-            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap &copy; CARTO',
-                maxZoom: 19
-            }),
-            google: L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                attribution: '&copy; Google Maps',
-                maxZoom: 20
-            }),
-            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-                attribution: '&copy; Google Satellite',
-                maxZoom: 20
-            })
-        };
-
         // Initialize Map
         function initMap() {
             map = L.map('map').setView([0, 0], 2);
 
-            currentTileLayer = tileLayers.carto;
-            currentTileLayer.addTo(map);
+            // Fixed Carto Base Layer using key parameter
+            L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`, {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                maxZoom: 19
+            }).addTo(map);
 
             pathLine = L.polyline([], { color: '#007aff', weight: 4, opacity: 0.7 }).addTo(map);
 
             fetchLocationData();
-            startPolling();
+            pollTimer = setInterval(fetchLocationData, POLL_INTERVAL);
         }
 
-        // Switch Map Layer Function
-        function switchMapLayer(layerKey) {
-            if (currentTileLayer) {
-                map.removeLayer(currentTileLayer);
-            }
-            if (tileLayers[layerKey]) {
-                currentTileLayer = tileLayers[layerKey];
-                currentTileLayer.addTo(map);
+        // Generate Directions URL based on Device Platform
+        function getDirectionsUrl(lat, lng) {
+            const isAppleDevice = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent);
+            if (isAppleDevice) {
+                return `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+            } else {
+                return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
             }
         }
 
@@ -213,8 +172,21 @@
 
                 const data = await response.json();
                 if (data && data.record) {
-                    renderTrackingData(data.record);
-                    if (isPollingActive) updateStatus('Live', 'active');
+                    const record = data.record;
+
+                    // Stop polling if server signals polling is disabled
+                    if (record.isPolling === false || record.polling === false) {
+                        if (pollTimer) {
+                            clearInterval(pollTimer);
+                            pollTimer = null;
+                        }
+                        renderTrackingData(record);
+                        updateStatus('Polling Disabled', 'disabled');
+                        return;
+                    }
+
+                    renderTrackingData(record);
+                    updateStatus('Live', 'active');
                 } else {
                     updateStatus('Invalid Data Format', 'error');
                 }
@@ -227,14 +199,23 @@
         // Render Location Marker and Breadcrumb Line
         function renderTrackingData(record) {
             const currentLatLng = [record.lat, record.lng];
+            const directionsUrl = getDirectionsUrl(record.lat, record.lng);
+
+            const popupContent = `
+                <div style="text-align: center;">
+                    <b>Armin</b><br>
+                    <span style="font-size: 11px; color: #666;">Updated: ${record.timestamp || 'Just now'}</span><br>
+                    <a href="${directionsUrl}" target="_blank" class="directions-btn">🚗 Get Directions</a>
+                </div>
+            `;
 
             if (!marker) {
                 marker = L.marker(currentLatLng, { icon: potatoIcon }).addTo(map);
-                marker.bindPopup(`<b>Armin</b><br>Updated: ${record.timestamp || 'Just now'}`);
+                marker.bindPopup(popupContent);
                 map.setView(currentLatLng, 15);
             } else {
                 marker.setLatLng(currentLatLng);
-                marker.getPopup().setContent(`<b>Armin</b><br>Updated: ${record.timestamp || 'Just now'}`);
+                marker.getPopup().setContent(popupContent);
             }
 
             if (Array.isArray(record.history) && record.history.length > 0) {
@@ -243,38 +224,6 @@
                 pathLine.setLatLngs(latLngs);
             } else {
                 pathLine.setLatLngs([currentLatLng]);
-            }
-        }
-
-        // Polling Timers & State Handlers
-        function startPolling() {
-            if (!pollTimer) {
-                pollTimer = setInterval(fetchLocationData, POLL_INTERVAL);
-            }
-            isPollingActive = true;
-            updateStatus('Live', 'active');
-        }
-
-        function stopPolling() {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-                pollTimer = null;
-            }
-            isPollingActive = false;
-            updateStatus('Polling Paused', 'paused');
-        }
-
-        function togglePolling() {
-            const btn = document.getElementById('togglePollingBtn');
-            if (isPollingActive) {
-                stopPolling();
-                btn.textContent = 'Resume';
-                btn.classList.add('off');
-            } else {
-                fetchLocationData();
-                startPolling();
-                btn.textContent = 'Pause';
-                btn.classList.remove('off');
             }
         }
 
