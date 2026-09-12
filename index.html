@@ -269,18 +269,23 @@
                 const appUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
                 const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
-                // Try opening native app scheme
-                window.location.href = appUrl;
+                // Try opening native app scheme via iframe to avoid altering current tab's URL
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = appUrl;
+                document.body.appendChild(iframe);
 
-                // Fallback to web browser if app isn't installed
+                const start = Date.now();
                 setTimeout(() => {
-                    if (!document.hidden) {
-                        window.location.href = webUrl;
+                    document.body.removeChild(iframe);
+                    // Fallback to web view in a new tab if app wasn't opened and page remains visible
+                    if (Date.now() - start < 1500 && !document.hidden) {
+                        window.open(webUrl, '_blank');
                     }
-                }, 500);
+                }, 1000);
 
             } else if (provider === 'apple') {
-                window.location.href = `maps://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+                window.open(`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, '_blank');
             }
 
             closeActionSheet();
