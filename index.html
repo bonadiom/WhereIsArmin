@@ -172,6 +172,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
+            text-decoration: none;
         }
 
         .action-sheet-btn:last-child {
@@ -208,8 +209,8 @@
         <div class="action-sheet">
             <div class="action-sheet-header">Get Directions</div>
             <div class="action-sheet-group">
-                <button class="action-sheet-btn" onclick="openMapApp('google')">🗺️ Open Google Maps</button>
-                <button class="action-sheet-btn" onclick="openMapApp('apple')">🍎 Open Apple Maps</button>
+                <a id="googleMapsBtn" class="action-sheet-btn" target="_blank" rel="noopener noreferrer" onclick="closeActionSheet()">🗺️ Open Google Maps</a>
+                <a id="appleMapsBtn" class="action-sheet-btn" target="_blank" rel="noopener noreferrer" onclick="closeActionSheet()">🍎 Open Apple Maps</a>
             </div>
             <button class="action-sheet-btn action-sheet-cancel" onclick="closeActionSheet()">Cancel</button>
         </div>
@@ -251,44 +252,23 @@
             pollTimer = setInterval(fetchLocationData, POLL_INTERVAL);
         }
 
-        // Action Sheet Controls
+        // Update Action Sheet Links dynamically
         function showActionSheet() {
+            const { lat, lng } = targetCoords;
+
+            // Universal Link: iOS hands this off directly to the Google Maps app without navigating away
+            document.getElementById('googleMapsBtn').href = `https://maps.google.com/maps?daddr=${lat},${lng}&dirflg=d`;
+            
+            // Apple Maps URL scheme
+            document.getElementById('appleMapsBtn').href = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+
             document.getElementById('actionSheetOverlay').classList.add('active');
         }
 
         function closeActionSheet(event) {
-            if (!event || event.target.id === 'actionSheetOverlay' || event.target.classList.contains('action-sheet-cancel')) {
+            if (!event || event.target.id === 'actionSheetOverlay' || event.target.classList.contains('action-sheet-cancel') || event.target.tagName === 'A') {
                 document.getElementById('actionSheetOverlay').classList.remove('active');
             }
-        }
-
-        function openMapApp(provider) {
-            const { lat, lng } = targetCoords;
-
-            if (provider === 'google') {
-                const appUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
-                const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-
-                // Try opening native app scheme via iframe to avoid altering current tab's URL
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = appUrl;
-                document.body.appendChild(iframe);
-
-                const start = Date.now();
-                setTimeout(() => {
-                    document.body.removeChild(iframe);
-                    // Fallback to web view in a new tab if app wasn't opened and page remains visible
-                    if (Date.now() - start < 1500 && !document.hidden) {
-                        window.open(webUrl, '_blank');
-                    }
-                }, 1000);
-
-            } else if (provider === 'apple') {
-                window.open(`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, '_blank');
-            }
-
-            closeActionSheet();
         }
 
         // Fetch Data from JSONBin
