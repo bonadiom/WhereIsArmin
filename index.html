@@ -41,7 +41,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
             font-size: 14px;
             font-weight: 500;
         }
@@ -50,6 +50,22 @@
             font-weight: 700;
             font-size: 16px;
             color: #1c1c1e;
+            white-space: nowrap;
+        }
+
+        .divider {
+            width: 1px;
+            height: 16px;
+            background-color: #d1d1d6;
+        }
+
+        .countdown-container {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #007aff;
             white-space: nowrap;
         }
 
@@ -196,6 +212,15 @@
     <div class="control-panel">
         <span class="header-title">Where is Armin?</span>
         
+        <div class="divider"></div>
+
+        <div class="countdown-container">
+            <span>🏃</span>
+            <span id="countdownText">Calculating...</span>
+        </div>
+
+        <div class="divider"></div>
+
         <div class="status-container">
             <span id="statusIndicator" class="status-indicator"></span>
             <span id="statusText">Connecting...</span>
@@ -209,7 +234,7 @@
         <div class="action-sheet">
             <div class="action-sheet-header">Get Directions</div>
             <div class="action-sheet-group">
-                <a id="googleMapsBtn" class="action-sheet-btn" target="_blank" rel="noopener noreferrer" onclick="closeActionSheet()">🗺️ Open Google Maps</a>
+                <a id="googleMapsBtn" class="action-sheet-btn" target="_blank" rel="noopener noreferrer" onclick="closeActionSheet()">🗺 Open Google Maps</a>
                 <a id="appleMapsBtn" class="action-sheet-btn" target="_blank" rel="noopener noreferrer" onclick="closeActionSheet()">🍎 Open Apple Maps</a>
             </div>
             <button class="action-sheet-btn action-sheet-cancel" onclick="closeActionSheet()">Cancel</button>
@@ -225,8 +250,12 @@
         const CARTO_KEY = 'cb1_3hv2_1_ded0cfddf9aef0a5008bf567';
         const POLL_INTERVAL = 15000;
 
+        // Saturday, October 3, 2026 at 06:00:00 AM Local Time
+        const RUN_START_TIME = new Date(2026, 9, 3, 6, 0, 0).getTime();
+
         let map, marker, pathLine;
         let pollTimer = null;
+        let countdownTimer = null;
         let targetCoords = { lat: 0, lng: 0 };
 
         // Custom Potato Marker
@@ -237,29 +266,54 @@
             popupAnchor: [0, -21]
         });
 
-        // Initialize Map
+        // Initialize Map & Start Timers
         function initMap() {
             map = L.map('map').setView([0, 0], 2);
 
             L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`, {
-                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
                 maxZoom: 19
             }).addTo(map);
 
             pathLine = L.polyline([], { color: '#007aff', weight: 4, opacity: 0.7 }).addTo(map);
 
+            // Fetch initial data & start background interval
             fetchLocationData();
             pollTimer = setInterval(fetchLocationData, POLL_INTERVAL);
+
+            // Start Event Countdown Timer
+            updateCountdown();
+            countdownTimer = setInterval(updateCountdown, 1000);
         }
 
-        // Update Action Sheet Links dynamically
+        // Live Event Countdown Logic
+        function updateCountdown() {
+            const now = new Date().getTime();
+            const timeDiff = RUN_START_TIME - now;
+
+            if (timeDiff <= 0) {
+                document.getElementById('countdownText').textContent = "Run in Progress!";
+                if (countdownTimer) clearInterval(countdownTimer);
+                return;
+            }
+
+            const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+
+            if (days > 0) {
+                document.getElementById('countdownText').textContent = `${days}d ${hours}h ${minutes}m until run`;
+            } else {
+                document.getElementById('countdownText').textContent = `${hours}h ${minutes}m ${seconds}s until run`;
+            }
+        }
+
+        // Action Sheet Controls
         function showActionSheet() {
             const { lat, lng } = targetCoords;
 
-            // Universal Link: iOS hands this off directly to the Google Maps app without navigating away
             document.getElementById('googleMapsBtn').href = `https://maps.google.com/maps?daddr=${lat},${lng}&dirflg=d`;
-            
-            // Apple Maps URL scheme
             document.getElementById('appleMapsBtn').href = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
 
             document.getElementById('actionSheetOverlay').classList.add('active');
@@ -271,7 +325,7 @@
             }
         }
 
-        // Fetch Data from JSONBin
+        // Fetch Data from JSONBin with One-Time Stop Rule
         async function fetchLocationData() {
             try {
                 const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
@@ -287,17 +341,21 @@
                 if (data && data.record) {
                     const record = data.record;
 
-                    if (record.isPolling === false || record.polling === false) {
+                    // Render current data point once regardless of status
+                    renderTrackingData(record);
+
+                    // Check if polling has been turned off
+                    const isPollingOff = (record.isPolling === false || record.polling === false);
+
+                    if (isPollingOff) {
                         if (pollTimer) {
                             clearInterval(pollTimer);
                             pollTimer = null;
                         }
-                        renderTrackingData(record);
                         updateStatus('Polling Disabled', 'disabled');
                         return;
                     }
 
-                    renderTrackingData(record);
                     updateStatus('Live', 'active');
                 } else {
                     updateStatus('Invalid Data Format', 'error');
@@ -308,7 +366,7 @@
             }
         }
 
-        // Render Location Marker and Breadcrumb Line
+        // Render Location Marker and Path
         function renderTrackingData(record) {
             targetCoords = { lat: record.lat, lng: record.lng };
             const currentLatLng = [record.lat, record.lng];
@@ -345,7 +403,7 @@
             indicator.className = `status-indicator ${stateClass}`;
         }
 
-        window.onload = initMap;
+        window.addEventListener('DOMContentLoaded', initMap);
     </script>
 </body>
 </html>
