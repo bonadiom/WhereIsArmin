@@ -241,19 +241,21 @@
         </div>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Leaflet JS & GPX Plugin -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
 
     <script>
         const BIN_ID = '6a8a12a3f5f4af5e2936895d';
         const MASTER_KEY = '$2a$10$GXxVX6GLqhKDpXueW6PhqeL6Vfz9YTosERgsmxkPeplmCvzMIkPCi';
         const CARTO_KEY = 'cb1_3hv2_1_ded0cfddf9aef0a5008bf567';
         const POLL_INTERVAL = 15000;
+        const GPX_FILE_URL = 'FullRoute.gpx'; // Updated to point to FullRoute.gpx
 
         // Saturday, October 3, 2026 at 06:00:00 AM Local Time
         const RUN_START_TIME = new Date(2026, 9, 3, 6, 0, 0).getTime();
 
-        let map, marker, pathLine;
+        let map, marker, pathLine, gpxLayer;
         let pollTimer = null;
         let countdownTimer = null;
         let targetCoords = { lat: 0, lng: 0 };
@@ -275,7 +277,11 @@
                 maxZoom: 19
             }).addTo(map);
 
-            pathLine = L.polyline([], { color: '#007aff', weight: 4, opacity: 0.7 }).addTo(map);
+            // Live runner breadcrumb polyline
+            pathLine = L.polyline([], { color: '#007aff', weight: 5, opacity: 0.9 }).addTo(map);
+
+            // Load planned route GPX
+            loadGpxRoute();
 
             // Fetch initial data & start background interval
             fetchLocationData();
@@ -284,6 +290,31 @@
             // Start Event Countdown Timer
             updateCountdown();
             countdownTimer = setInterval(updateCountdown, 1000);
+        }
+
+        // Load and Render GPX Route
+        function loadGpxRoute() {
+            gpxLayer = new L.GPX(GPX_FILE_URL, {
+                async: true,
+                marker_options: {
+                    startIconUrl: null, // Disable default start icon
+                    endIconUrl: null,   // Disable default end icon
+                    shadowUrl: null
+                },
+                polyline_options: {
+                    color: '#ff2d55',  // Vibrant coral red for planned route
+                    opacity: 0.65,
+                    weight: 4,
+                    dashArray: '6, 8'  // Dashed style to distinguish planned route vs live trail
+                }
+            }).on('loaded', function(e) {
+                // Adjust initial map bounds to show the entire GPX route if live location marker isn't active yet
+                if (!marker) {
+                    map.fitBounds(e.target.getBounds(), { padding: [50, 50] });
+                }
+            }).on('error', function(err) {
+                console.warn('FullRoute.gpx could not be loaded or parsed:', err);
+            }).addTo(map);
         }
 
         // Live Event Countdown Logic
