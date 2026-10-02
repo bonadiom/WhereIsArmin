@@ -36,21 +36,41 @@
             z-index: 1000;
             background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(8px);
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 24px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             font-size: 14px;
             font-weight: 500;
         }
 
         .header-title {
             font-weight: 700;
-            font-size: 16px;
+            font-size: 15px;
             color: #1c1c1e;
             white-space: nowrap;
+        }
+
+        .help-btn {
+            background: #e5e5ea;
+            color: #007aff;
+            border: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+
+        .help-btn:hover {
+            background: #d1d1d6;
         }
 
         .divider {
@@ -94,6 +114,81 @@
 
         .status-indicator.error {
             background-color: #ff3b30;
+        }
+
+        /* Help Modal Dialog */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-card {
+            background: #ffffff;
+            width: 85%;
+            max-width: 320px;
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            transform: scale(0.9);
+            transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .modal-overlay.active .modal-card {
+            transform: scale(1);
+        }
+
+        .modal-icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+        }
+
+        .modal-title {
+            font-weight: 700;
+            font-size: 18px;
+            color: #1c1c1e;
+            margin-bottom: 8px;
+        }
+
+        .modal-body {
+            font-size: 14px;
+            color: #3a3a3c;
+            line-height: 1.4;
+            margin-bottom: 20px;
+        }
+
+        .modal-close-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #007aff;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .modal-close-btn:hover {
+            background-color: #0056b3;
         }
 
         /* Marker Popup Button */
@@ -211,6 +306,7 @@
 
     <div class="control-panel">
         <span class="header-title">Where is Armin?</span>
+        <button class="help-btn" onclick="openHelpModal()" title="Help">?</button>
         
         <div class="divider"></div>
 
@@ -228,6 +324,18 @@
     </div>
 
     <div id="map"></div>
+
+    <!-- Help Dialog Modal -->
+    <div id="helpModal" class="modal-overlay" onclick="closeHelpModal(event)">
+        <div class="modal-card">
+            <div class="modal-icon">📍</div>
+            <div class="modal-title">Finding Armin</div>
+            <div class="modal-body">
+                Touch the runner on the map to get directions to meet Armin.
+            </div>
+            <button class="modal-close-btn" onclick="closeHelpModal()">Got It</button>
+        </div>
+    </div>
 
     <!-- Slide-Up Action Sheet Panel -->
     <div id="actionSheetOverlay" class="action-sheet-overlay" onclick="closeActionSheet(event)">
@@ -250,7 +358,7 @@
         const MASTER_KEY = '$2a$10$GXxVX6GLqhKDpXueW6PhqeL6Vfz9YTosERgsmxkPeplmCvzMIkPCi';
         const CARTO_KEY = 'cb1_3hv2_1_ded0cfddf9aef0a5008bf567';
         const POLL_INTERVAL = 15000;
-        const GPX_FILE_URL = 'FullRoute.gpx'; // Updated to point to FullRoute.gpx
+        const GPX_FILE_URL = 'FullRoute.gpx';
 
         // Saturday, October 3, 2026 at 06:00:00 AM Local Time
         const RUN_START_TIME = new Date(2026, 9, 3, 6, 0, 0).getTime();
@@ -290,6 +398,23 @@
             // Start Event Countdown Timer
             updateCountdown();
             countdownTimer = setInterval(updateCountdown, 1000);
+
+            // Automatically show help dialog on first visit
+            if (!localStorage.getItem('hasSeenHelp')) {
+                openHelpModal();
+            }
+        }
+
+        // Help Modal Controls
+        function openHelpModal() {
+            document.getElementById('helpModal').classList.add('active');
+        }
+
+        function closeHelpModal(event) {
+            if (!event || event.target.id === 'helpModal' || event.target.classList.contains('modal-close-btn')) {
+                document.getElementById('helpModal').classList.remove('active');
+                localStorage.setItem('hasSeenHelp', 'true');
+            }
         }
 
         // Load and Render GPX Route
@@ -297,18 +422,17 @@
             gpxLayer = new L.GPX(GPX_FILE_URL, {
                 async: true,
                 marker_options: {
-                    startIconUrl: null, // Disable default start icon
-                    endIconUrl: null,   // Disable default end icon
+                    startIconUrl: null,
+                    endIconUrl: null,
                     shadowUrl: null
                 },
                 polyline_options: {
-                    color: '#ff2d55',  // Vibrant coral red for planned route
+                    color: '#ff2d55',
                     opacity: 0.65,
                     weight: 4,
-                    dashArray: '6, 8'  // Dashed style to distinguish planned route vs live trail
+                    dashArray: '6, 8'
                 }
             }).on('loaded', function(e) {
-                // Adjust initial map bounds to show the entire GPX route if live location marker isn't active yet
                 if (!marker) {
                     map.fitBounds(e.target.getBounds(), { padding: [50, 50] });
                 }
@@ -372,10 +496,8 @@
                 if (data && data.record) {
                     const record = data.record;
 
-                    // Render current data point once regardless of status
                     renderTrackingData(record);
 
-                    // Check if polling has been turned off
                     const isPollingOff = (record.isPolling === false || record.polling === false);
 
                     if (isPollingOff) {
